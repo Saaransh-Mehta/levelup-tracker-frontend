@@ -66,7 +66,10 @@ function Sessions() {
   const [openRow, setOpenRow] = useState(null)
 
   useEffect(() => {
-    api.get(`/sessions?limit=${RECENT}`).then(({ data: d }) => setData(d))
+    // "Today" is the user's own day, not the server's (which runs on UTC).
+    const dayStart = new Date()
+    dayStart.setHours(0, 0, 0, 0)
+    api.get('/sessions', { params: { limit: RECENT, dayStart: dayStart.toISOString() } }).then(({ data: d }) => setData(d))
       .catch(() => setData({ sessions: [], stats: { count: 0, seconds: 0, todaySeconds: 0 } }))
   }, [])
 

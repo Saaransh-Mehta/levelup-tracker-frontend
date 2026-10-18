@@ -3,8 +3,9 @@ import { Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
   Check, ChevronRight, ChevronsDownUp, Circle, CircleDot, FileText, FolderClosed,
-  LayoutGrid, ListChecks, Lock, PanelLeft, Plus, Swords, Target, Timer, Wallet,
+  LayoutGrid, ListChecks, Lock, LogOut, PanelLeft, Plus, Swords, Target, Timer, Wallet,
 } from 'lucide-react'
+import { signOut } from '../api'
 import { useAppData } from '../context/appDataContext'
 
 // Folders that aren't built yet, with what they'll hold.
@@ -361,9 +362,19 @@ function Workspace({ title, step, folder, tabIcon, status, wide = false, childre
 
         <div className="vault-bar">
           <span className="vault-name">LevelUp</span>
-          <span className="vault-account">
-            {app?.me?.username || (signedIn ? 'signed in' : 'guest')}
-          </span>
+          {app ? (
+            <>
+              <Link to="/profile" className={`vault-account ${pathname === '/profile' ? 'is-active' : ''}`}
+                onClick={onNavigate} title="Profile">
+                {app.me?.username || 'Profile'}
+              </Link>
+              <button type="button" className="icon-btn" onClick={signOut} aria-label="Log out" title="Log out">
+                <LogOut size={15} />
+              </button>
+            </>
+          ) : (
+            <span className="vault-account">{signedIn ? 'signed in' : 'guest'}</span>
+          )}
         </div>
       </aside>
 

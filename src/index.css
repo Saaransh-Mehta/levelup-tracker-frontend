@@ -2721,3 +2721,38 @@ kbd {
 @media (max-width: 800px) {
   .camp-todo-play { opacity: 1; }
 }
+
+/* ---------- Profile ---------- */
+
+.property-static {
+  min-width: 0;
+  padding: 0 14px;
+  font-size: 15px;
+  color: var(--text-normal);
+  overflow-wrap: anywhere;
+}
+.property-static.mono { font-family: var(--font-mono); font-size: 14px; }
+.property-inline-form { display: flex; gap: 8px; min-width: 0; }
+.property-inline-form .property-value { flex: 1; }
+.property-inline-form .btn { flex-shrink: 0; height: 42px; }
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  cursor: pointer;
+}
+.link-btn:hover { text-decoration: underline; text-underline-offset: 3px; }
+.link-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+
+.forgot-link { justify-self: end; font-size: 14px; color: var(--text-muted); text-decoration: none; }
+.forgot-link:hover { color: var(--accent-text); }
+.forgot-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.forgot-row { display: grid; margin-top: 8px; }
+
+.vault-account { text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+a.vault-account:hover { color: var(--text-normal); }
+a.vault-account.is-active { color: var(--accent-text); }
+a.vault-account:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }

@@ -111,6 +111,9 @@ function Login() {
               </div>
             </div>
           </div>
+          <div className="forgot-row">
+            <Link to="/forgot-password" className="forgot-link">Forgot password?</Link>
+          </div>
         </div>
 
         {error && (

@@ -45,6 +45,12 @@ api.interceptors.response.use(
   },
 )
 
+// Forgets the token and reloads into the login page, so nothing from this account stays in memory.
+export const signOut = () => {
+  localStorage.removeItem('token')
+  window.location.assign('/login')
+}
+
 export const getErrorMessage = (err) =>
   err.response?.data?.message || 'Could not reach the server, please try again'
 

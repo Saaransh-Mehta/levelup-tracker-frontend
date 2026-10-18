@@ -3,6 +3,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import Register from './pages/Register'
 import Login from './pages/Login'
 import Onboarding from './pages/Onboarding'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
 import { SignedIn } from './context/AppData'
 
 // The goal pages carry the editor, so they load on first visit instead of with sign-up.
@@ -16,6 +18,7 @@ const Finance = lazy(() => import('./pages/Finance'))
 const CampaignsIndex = lazy(() => import('./pages/CampaignsIndex'))
 const NewCampaign = lazy(() => import('./pages/NewCampaign'))
 const CampaignPage = lazy(() => import('./pages/CampaignPage'))
+const Profile = lazy(() => import('./pages/Profile'))
 
 function App() {
   return (
@@ -25,6 +28,8 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/login" element={<Login />} />
           <Route path="/onboarding" element={<Onboarding />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route element={<SignedIn />}>
             <Route path="/goals" element={<GoalsIndex />} />
             <Route path="/goals/new" element={<NewGoal />} />
@@ -36,6 +41,7 @@ function App() {
             <Route path="/campaigns" element={<CampaignsIndex />} />
             <Route path="/campaigns/new" element={<NewCampaign />} />
             <Route path="/campaigns/:id" element={<CampaignPage />} />
+            <Route path="/profile" element={<Profile />} />
           </Route>
           <Route path="*" element={<Navigate to={localStorage.getItem('token') ? '/goals' : '/register'} replace />} />
         </Routes>
