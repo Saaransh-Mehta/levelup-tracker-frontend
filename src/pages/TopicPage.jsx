@@ -89,7 +89,7 @@ function TopicPage({ id }) {
   const [saveState, setSaveState] = useState('saved')
   const [pickingIcon, setPickingIcon] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [playing, setPlaying] = useState(null)
+  const [playingId, setPlayingId] = useState(null)
   const [toast, setToast] = useState(location.state?.created ? 'created' : null)
 
   const pending = useRef({})
@@ -175,15 +175,20 @@ function TopicPage({ id }) {
     upsertTopic({ ...saved, title: topic.title, icon: topic.icon })
   }
 
+  // A video's timestamped notes changed: swap in the saved video.
+  const updateVideo = useCallback((video) => {
+    setTopic((t) => ({ ...t, videos: t.videos.map((v) => (v._id === video._id ? video : v)) }))
+  }, [])
+
   const play = (video) => {
-    setPlaying(video)
+    setPlayingId(video._id)
     requestAnimationFrame(() => playerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }))
   }
 
   const removeVideo = async (video) => {
     const before = topic.videos
     setTopic((t) => ({ ...t, videos: t.videos.filter((v) => v._id !== video._id) }))
-    if (playing?._id === video._id) setPlaying(null)
+    if (playingId === video._id) setPlayingId(null)
     try {
       const { data } = await api.delete(`/topics/${id}/videos/${video._id}`)
       takeVideos(data.topic)
@@ -234,6 +239,7 @@ function TopicPage({ id }) {
     )
   }
 
+  const playing = topic.videos.find((v) => v._id === playingId) || null
   const saveLabel = { saved: 'Saved', unsaved: 'Editing…', saving: 'Saving…', error: 'Not saved, will retry' }[saveState]
 
   return (
@@ -284,7 +290,8 @@ function TopicPage({ id }) {
                   initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
                   exit={{ opacity: 0, height: 0 }} transition={{ duration: 0.35, ease: EASE }}>
                   <div className="topic-player-inner">
-                    <VideoPlayer key={playing._id} video={playing} autoplay onClose={() => setPlaying(null)} />
+                    <VideoPlayer key={playing._id} video={playing} autoplay onClose={() => setPlayingId(null)}
+                      topicId={id} onVideo={updateVideo} />
                   </div>
                 </motion.section>
               )}
@@ -307,7 +314,7 @@ function TopicPage({ id }) {
               <AddVideoForm topicId={id} onAdded={(saved, video) => { takeVideos(saved); play(video) }}
                 autoFocus={Boolean(location.state?.created)} />
               {topic.videos.length > 0 ? (
-                <VideoList videos={topic.videos} activeId={playing?._id} onSelect={play} onRemove={removeVideo} />
+                <VideoList videos={topic.videos} activeId={playingId} onSelect={play} onRemove={removeVideo} />
               ) : (
                 <p className="study-hint">Lectures, tutorials, explainers. Links with a timestamp start from that point.</p>
               )}

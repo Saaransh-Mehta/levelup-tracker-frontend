@@ -504,7 +504,9 @@ function Focus() {
           </div>
           <div className="study-scroll">
             {playingVideo && (
-              <VideoPlayer video={playingVideo} onOpenOutside={() => { allowedLeaveAt.current = Date.now() }} />
+              <VideoPlayer video={playingVideo} onOpenOutside={() => { allowedLeaveAt.current = Date.now() }}
+                topicId={topic._id}
+                onVideo={(video) => setTopic((t) => ({ ...t, videos: t.videos.map((v) => (v._id === video._id ? video : v)) }))} />
             )}
             <div className="study-videos">
               {topic.videos.length > 0 && (
