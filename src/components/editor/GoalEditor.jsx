@@ -114,8 +114,8 @@ function FormatBar({ editor }) {
   )
 }
 
-// A Notion-style block editor for a goal's note. Calls onChange with the JSON document.
-function GoalEditor({ content, onChange, autoFocus = false }) {
+// A Notion-style block editor for a goal's or topic's note. Calls onChange with the JSON document.
+function GoalEditor({ content, onChange, autoFocus = false, label = 'Goal notes' }) {
   const [menu, setMenu] = useState(null)
   const [active, setActive] = useState(0)
   const live = useRef({ menu: null, active: 0, onChange })
@@ -170,7 +170,7 @@ function GoalEditor({ content, onChange, autoFocus = false }) {
     ],
     content,
     autofocus: autoFocus ? 'end' : false,
-    editorProps: { attributes: { class: 'goal-doc', 'aria-label': 'Goal notes' } },
+    editorProps: { attributes: { class: 'goal-doc', 'aria-label': label } },
     onUpdate: ({ editor: e }) => live.current.onChange(e.getJSON()),
   })
 

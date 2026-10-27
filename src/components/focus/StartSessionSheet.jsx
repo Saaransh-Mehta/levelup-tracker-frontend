@@ -11,8 +11,9 @@ const MAX_APPS = 2
 
 // Sets up a focus session: length, allowed apps, and a reminder to silence the device.
 // Without a goal it starts a free session, with an optional label. With a campaign to-do
-// ({ campaign, date, _id, text, icon }) the time goes to that to-do.
-function StartSessionSheet({ goal = null, todo = null, onClose }) {
+// ({ campaign, date, _id, text, icon }) the time goes to that to-do. With a study topic it starts
+// a study session, which opens the topic's videos and notes beside the timer.
+function StartSessionSheet({ goal = null, todo = null, topic = null, onClose }) {
   const navigate = useNavigate()
   const { me, setMe, setActiveSession } = useAppData()
   const [minutes, setMinutes] = useState(() => defaultMinutes(me?.personality?.workStyle))
@@ -58,7 +59,9 @@ function StartSessionSheet({ goal = null, todo = null, onClose }) {
         ? await api.post(`/goals/${goal._id}/sessions`, { minutes })
         : todo
           ? await api.post(`/campaigns/${todo.campaign}/days/${todo.date}/todos/${todo._id}/sessions`, { minutes, today: localToday() })
-          : await api.post('/sessions', { minutes, label })
+          : topic
+            ? await api.post(`/topics/${topic._id}/sessions`, { minutes })
+            : await api.post('/sessions', { minutes, label })
       setActiveSession(data.session)
       navigate(`/focus/${data.session._id}`)
     } catch (err) {
@@ -83,19 +86,21 @@ function StartSessionSheet({ goal = null, todo = null, onClose }) {
         exit={{ opacity: 0, y: 16, scale: 0.98 }} transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
         <div className="sheet-head">
           <div>
-            <h2 id="sheet-title">{goal ? 'Start a focus session' : todo ? 'Focus on this to-do' : 'Start a free session'}</h2>
+            <h2 id="sheet-title">{goal ? 'Start a focus session' : todo ? 'Focus on this to-do' : topic ? 'Start a study session' : 'Start a free session'}</h2>
             <p className="text-muted">
               {goal
                 ? <><span className="sheet-goal-icon" aria-hidden="true">{goal.icon}</span>{goal.title}</>
                 : todo
                   ? <><span className="sheet-goal-icon" aria-hidden="true">{todo.icon}</span>{todo.text}</>
-                  : 'Not tied to a goal. Good for deep work, study or clearing a backlog.'}
+                  : topic
+                    ? <><span className="sheet-goal-icon" aria-hidden="true">{topic.icon}</span>{topic.title}</>
+                    : 'Not tied to a goal. Good for deep work, study or clearing a backlog.'}
             </p>
           </div>
           <button type="button" className="icon-btn" onClick={onClose} aria-label="Close"><X size={16} /></button>
         </div>
 
-        {!goal && !todo && (
+        {!goal && !todo && !topic && (
           <section className="sheet-section">
             <label htmlFor="session-label" className="sheet-label">What are you working on? <span className="text-faint">Optional</span></label>
             <input id="session-label" className="property-value" value={label} maxLength={80} autoFocus

@@ -19,6 +19,8 @@ const CampaignsIndex = lazy(() => import('./pages/CampaignsIndex'))
 const NewCampaign = lazy(() => import('./pages/NewCampaign'))
 const CampaignPage = lazy(() => import('./pages/CampaignPage'))
 const Profile = lazy(() => import('./pages/Profile'))
+const StudyIndex = lazy(() => import('./pages/StudyIndex'))
+const TopicRoute = lazy(() => import('./pages/TopicPage'))
 
 function App() {
   return (
@@ -36,6 +38,8 @@ function App() {
             <Route path="/goals/:id" element={<GoalRoute />} />
             <Route path="/focus/:id" element={<FocusRoute />} />
             <Route path="/sessions" element={<Sessions />} />
+            <Route path="/study" element={<StudyIndex />} />
+            <Route path="/study/:id" element={<TopicRoute />} />
             <Route path="/habits" element={<Habits />} />
             <Route path="/finance" element={<Finance />} />
             <Route path="/campaigns" element={<CampaignsIndex />} />

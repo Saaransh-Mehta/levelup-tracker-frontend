@@ -15,20 +15,24 @@ const EASE = [0.2, 0.8, 0.2, 1]
 
 function SessionRow({ session, index, open, onToggle }) {
   const goal = session.goal
-  const title = goal?.title || session.label || 'Free focus'
+  const topic = session.topic
+  // Where the row links to: the goal, or the topic for a study session.
+  const owner = goal ? { to: `/goals/${goal._id}`, label: 'Open goal', kind: 'Goal' }
+    : topic ? { to: `/study/${topic._id}`, label: 'Open topic', kind: 'Study' } : null
+  const title = goal?.title || topic?.title || session.label || 'Free focus'
   const hasNotes = Boolean(session.notes.trim())
 
   return (
     <motion.li className={`session-row ${open ? 'is-open' : ''}`} initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: EASE, delay: 0.1 + index * 0.05 }}>
       <button type="button" className="session-row-main" onClick={onToggle} aria-expanded={open}
-        disabled={!hasNotes && !goal}>
+        disabled={!hasNotes && !owner}>
         <span className="session-row-icon" aria-hidden="true">
-          {goal ? <span className="session-row-emoji">{goal.icon}</span> : <Timer size={18} />}
+          {goal || topic ? <span className="session-row-emoji">{(goal || topic).icon}</span> : <Timer size={18} />}
         </span>
         <span className="session-row-text">
           <span className="session-row-title">{title}</span>
-          <span className="session-row-sub">{sessionWhen(session.startedAt)} · {goal ? 'Goal' : 'Free session'}</span>
+          <span className="session-row-sub">{sessionWhen(session.startedAt)} · {owner ? owner.kind : 'Free session'}</span>
         </span>
         <span className="session-row-flags">
           {hasNotes && <NotebookPen size={14} aria-label="Has notes" />}
@@ -39,16 +43,18 @@ function SessionRow({ session, index, open, onToggle }) {
           )}
         </span>
         <span className="session-row-dur">{formatDuration(session.focusedSeconds)}</span>
-        {(hasNotes || goal) && <ChevronDown size={16} className="session-row-chevron" aria-hidden="true" />}
+        {(hasNotes || owner) && <ChevronDown size={16} className="session-row-chevron" aria-hidden="true" />}
       </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div className="session-row-detail" initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.25, ease: EASE }}>
             <div className="session-row-inner">
-              {hasNotes ? <p className="session-notes">{session.notes}</p> : <p className="text-faint">No notes for this session.</p>}
-              {goal && (
-                <Link to={`/goals/${goal._id}`} className="btn btn-ghost">Open goal<ArrowRight size={14} aria-hidden="true" /></Link>
+              {hasNotes
+                ? <p className="session-notes">{session.notes}</p>
+                : <p className="text-faint">{topic ? 'Notes from this session are on the topic page.' : 'No notes for this session.'}</p>}
+              {owner && (
+                <Link to={owner.to} className="btn btn-ghost">{owner.label}<ArrowRight size={14} aria-hidden="true" /></Link>
               )}
             </div>
           </motion.div>

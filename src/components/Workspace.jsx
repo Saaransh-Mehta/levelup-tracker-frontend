@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  Check, ChevronRight, ChevronsDownUp, Circle, CircleDot, FileText, FolderClosed,
+  BookOpen, Check, ChevronRight, ChevronsDownUp, Circle, CircleDot, FileText, FolderClosed,
   LayoutGrid, ListChecks, Lock, LogOut, PanelLeft, Plus, Swords, Target, Timer, Wallet,
 } from 'lucide-react'
 import { signOut } from '../api'
@@ -12,6 +12,7 @@ import { useAppData } from '../context/appDataContext'
 const FUTURE_FOLDERS = [
   { name: 'Goals', unlocks: 'Your goals and milestones live here.' },
   { name: 'Sessions', unlocks: 'Focus sessions you run on each goal.' },
+  { name: 'Study', unlocks: 'Topics you study, with notes and YouTube videos side by side.' },
   { name: 'Habits', unlocks: 'Daily and weekly habits with streaks.' },
   { name: 'Campaigns', unlocks: 'Time-boxed missions with daily rituals and a calendar.' },
   { name: 'Finance', unlocks: 'Income, spending and budgets.', tag: 'beta' },
@@ -50,7 +51,7 @@ function Workspace({ title, step, folder, tabIcon, status, wide = false, childre
   const app = useAppData()
   const { pathname } = useLocation()
   const [open, setOpen] = useState(() => !isNarrow() && readSidebarPref())
-  const [expanded, setExpanded] = useState({ 'Getting started': true, Account: true, Goals: true, Sessions: true, Habits: true, Campaigns: true, Finance: true })
+  const [expanded, setExpanded] = useState({ 'Getting started': true, Account: true, Goals: true, Sessions: true, Study: true, Habits: true, Campaigns: true, Finance: true })
   const signedIn = Boolean(localStorage.getItem('token'))
 
   const lockReason = app || step === 'done'
@@ -92,7 +93,7 @@ function Workspace({ title, step, folder, tabIcon, status, wide = false, childre
       ]
 
   // Inside the app, every folder is real; before sign-in they say what they'll hold.
-  const lockedFolders = FUTURE_FOLDERS.filter((f) => !(app && ['Goals', 'Sessions', 'Habits', 'Campaigns', 'Finance'].includes(f.name)))
+  const lockedFolders = FUTURE_FOLDERS.filter((f) => !(app && ['Goals', 'Sessions', 'Study', 'Habits', 'Campaigns', 'Finance'].includes(f.name)))
   const liveSession = app?.activeSession && ['running', 'paused'].includes(app.activeSession.status)
     ? app.activeSession
     : null
@@ -152,6 +153,12 @@ function Workspace({ title, step, folder, tabIcon, status, wide = false, childre
               <Timer size={18} />
             </button>
           )
+        )}
+        {app && (
+          <Link to="/study" className={`ribbon-btn ${pathname.startsWith('/study') ? 'is-current' : ''}`}
+            aria-label="Study" title="Study">
+            <BookOpen size={18} />
+          </Link>
         )}
         {app && (
           <Link to="/habits" className={`ribbon-btn ${pathname === '/habits' ? 'is-current' : ''}`}
@@ -253,6 +260,45 @@ function Workspace({ title, step, folder, tabIcon, status, wide = false, childre
                       </TreeRow>
                     </li>
                   )}
+                </ul>
+              )}
+            </li>
+          )}
+
+          {app && (
+            <li>
+              {folderButton('Study')}
+              {expanded.Study && (
+                <ul className="tree-children">
+                  <li>
+                    <TreeRow onNavigate={onNavigate} to="/study" active={pathname === '/study'}
+                      icon={<BookOpen size={14} className="tree-icon" aria-hidden="true" />}>
+                      All topics
+                    </TreeRow>
+                  </li>
+                  <AnimatePresence initial={false}>
+                    {(app.topics || []).map((t) => (
+                      <motion.li
+                        key={t._id}
+                        layout
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                      >
+                        <TreeRow onNavigate={onNavigate} to={`/study/${t._id}`} active={pathname === `/study/${t._id}`}
+                          icon={<span className="tree-emoji" aria-hidden="true">{t.icon}</span>}>
+                          {t.title}
+                        </TreeRow>
+                      </motion.li>
+                    ))}
+                  </AnimatePresence>
+                  <li>
+                    <TreeRow onNavigate={onNavigate} to="/study#new" active={false}
+                      icon={<Plus size={14} className="tree-icon" aria-hidden="true" />}>
+                      New topic
+                    </TreeRow>
+                  </li>
                 </ul>
               )}
             </li>

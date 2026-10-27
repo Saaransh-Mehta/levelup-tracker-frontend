@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { AnimatePresence, motion } from 'motion/react'
 import {
-  ArrowLeft, AppWindow, Eye, ExternalLink, Maximize, Minimize, NotebookPen, Pause, Play, RotateCcw, Square, X,
+  ArrowLeft, AppWindow, BookOpen, Eye, ExternalLink, Maximize, Minimize, NotebookPen, Pause, Play, Plus, RotateCcw,
+  Square, X,
 } from 'lucide-react'
 import api, { getErrorMessage } from '../api'
 import Eyes from '../components/focus/Eyes'
 import TimerDigits from '../components/focus/TimerDigits'
+import GoalEditor from '../components/editor/GoalEditor'
+import { AddVideoForm, VideoList, VideoPlayer } from '../components/study/Videos'
 import { useAppData } from '../context/appDataContext'
 import { focusedAt, formatClock, formatDuration, isOpen } from '../sessions'
 import { localToday } from '../habits'
@@ -42,11 +45,16 @@ const chime = () => {
 function Focus() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { me, setActiveSession, refreshGoals } = useAppData()
+  const { me, setActiveSession, refreshGoals, refreshTopics } = useAppData()
 
   const [session, setSession] = useState(null)
   const [goal, setGoal] = useState(null)
   const [todo, setTodo] = useState(null)
+  // A study session's topic: its videos play and its notes are edited beside the timer.
+  const [topic, setTopic] = useState(null)
+  const [videoId, setVideoId] = useState(null)
+  const [addingVideo, setAddingVideo] = useState(false)
+  const [topicState, setTopicState] = useState('saved')
   const [offset, setOffset] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   const [error, setError] = useState('')
@@ -58,6 +66,8 @@ function Focus() {
   const [busy, setBusy] = useState(false)
 
   const notesTimer = useRef(null)
+  const topicTimer = useRef(null)
+  const topicDoc = useRef(null)
   const allowedLeaveAt = useRef(0)
   const leftWhileRunning = useRef(false)
   const finishing = useRef(false)
@@ -79,6 +89,9 @@ function Focus() {
         apply(data)
         setGoal(data.goal)
         setTodo(data.todo)
+        setTopic(data.topic)
+        setVideoId(data.topic?.videos[0]?._id || null)
+        if (data.topic && isOpen(data.session)) setPanel('study')
         setNotes(data.session.notes)
       })
       .catch((err) => setError(err.response?.status === 404 ? 'This session no longer exists.' : getErrorMessage(err)))
@@ -101,8 +114,44 @@ function Focus() {
   const focused = focusedAt(session, offset, now)
   const remaining = session ? session.plannedSeconds - focused : 0
   const done = session && !isOpen(session)
-  const title = goal?.title || session?.label || 'Free focus'
-  const backTo = session?.goal ? `/goals/${session.goal}` : session?.campaign ? `/campaigns/${session.campaign}` : '/sessions'
+  const title = goal?.title || topic?.title || session?.label || 'Free focus'
+  const backTo = session?.goal
+    ? `/goals/${session.goal}`
+    : session?.campaign ? `/campaigns/${session.campaign}` : session?.topic ? `/study/${session.topic}` : '/sessions'
+  const topicId = session?.topic || null
+  const notesPanel = topicId ? 'study' : 'notes'
+
+  // Topic notes save on their own timer, straight to the topic.
+  const saveTopicDoc = useCallback(() => {
+    clearTimeout(topicTimer.current)
+    topicTimer.current = null
+    const doc = topicDoc.current
+    if (!doc || !topicId) return Promise.resolve()
+    topicDoc.current = null
+    setTopicState('saving')
+    return api.patch(`/topics/${topicId}`, { content: doc })
+      .then(() => setTopicState(topicDoc.current ? 'unsaved' : 'saved'))
+      .catch(() => {
+        topicDoc.current ??= doc
+        setTopicState('error')
+      })
+  }, [topicId])
+
+  const handleTopicDoc = useCallback((doc) => {
+    topicDoc.current = doc
+    setTopic((t) => ({ ...t, content: doc }))
+    setTopicState('unsaved')
+    clearTimeout(topicTimer.current)
+    topicTimer.current = setTimeout(saveTopicDoc, NOTES_SAVE_DELAY)
+  }, [saveTopicDoc])
+
+  // Save unsaved topic notes when leaving.
+  useEffect(() => () => {
+    if (topicId && topicDoc.current) {
+      clearTimeout(topicTimer.current)
+      api.patch(`/topics/${topicId}`, { content: topicDoc.current }).catch(() => {})
+    }
+  }, [topicId])
 
   const finish = useCallback(async () => {
     if (finishing.current) return
@@ -110,16 +159,19 @@ function Focus() {
     setBusy(true)
     try {
       clearTimeout(notesTimer.current)
-      await patch({ action: 'finish', notes: live.current.notes })
+      await Promise.all([patch({ action: 'finish', notes: live.current.notes }), saveTopicDoc()])
       chime()
+      // The summary sits under the study panel on a phone, so get it out of the way.
+      if (window.matchMedia('(max-width: 800px)').matches) setPanel((p) => (p === 'study' ? null : p))
       refreshGoals()
+      if (topicId) refreshTopics()
     } catch (err) {
       setError(getErrorMessage(err))
       finishing.current = false
     } finally {
       setBusy(false)
     }
-  }, [patch, refreshGoals])
+  }, [patch, refreshGoals, refreshTopics, saveTopicDoc, topicId])
 
   // Time's up.
   useEffect(() => {
@@ -228,17 +280,17 @@ function Focus() {
     }
   }, [id])
 
-  // Space pauses, N opens notes, F toggles fullscreen — unless typing.
+  // Space pauses, N opens notes (or the study panel), F toggles fullscreen — unless typing.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.target.closest('textarea, input')) return
+      if (e.target.closest('textarea, input, [contenteditable="true"]')) return
       if (e.code === 'Space') {
         e.preventDefault()
         togglePause()
       } else if (e.key === 'n') {
         // Stop the key from also landing in the notes box that opens.
         e.preventDefault()
-        setPanel((p) => (p === 'notes' ? null : 'notes'))
+        setPanel((p) => (p === notesPanel ? null : notesPanel))
       } else if (e.key === 'f') {
         e.preventDefault()
         toggleFullscreen()
@@ -246,7 +298,7 @@ function Focus() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [togglePause])
+  }, [togglePause, notesPanel])
 
   const startAnother = async () => {
     setBusy(true)
@@ -256,7 +308,9 @@ function Focus() {
         ? await api.post(`/goals/${session.goal}/sessions`, { minutes })
         : todo
           ? await api.post(`/campaigns/${todo.campaign._id}/days/${todo.date}/todos/${todo._id}/sessions`, { minutes, today: localToday() })
-          : await api.post('/sessions', { minutes, label: session.label })
+          : session.topic
+            ? await api.post(`/topics/${session.topic}/sessions`, { minutes })
+            : await api.post('/sessions', { minutes, label: session.label })
       finishing.current = false
       setActiveSession(data.session)
       navigate(`/focus/${data.session._id}`, { replace: true })
@@ -301,16 +355,20 @@ function Focus() {
   const apps = me?.focusApps || []
   const endsAt = running ? new Date(now + remaining * 1000).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : null
   const pct = session ? Math.min(1, focused / session.plannedSeconds) : 0
+  const studyOpen = panel === 'study'
+  const playingVideo = topic?.videos.find((v) => v._id === videoId) || topic?.videos[0] || null
 
   return (
-    <div className={`focus mood-${mood} ${panel ? 'has-panel' : ''}`}>
+    <div className={`focus mood-${mood} ${panel ? 'has-panel' : ''} ${studyOpen ? 'has-study' : ''}`}>
       <div className="focus-ambient" aria-hidden="true" />
 
       <header className="focus-top">
         <Link to={backTo} className="focus-back">
           <ArrowLeft size={16} aria-hidden="true" />
           <span className="focus-goal">
-            {(goal || todo?.campaign) && <span className="focus-goal-icon" aria-hidden="true">{(goal || todo.campaign).icon}</span>}
+            {(goal || todo?.campaign || topic) && (
+              <span className="focus-goal-icon" aria-hidden="true">{(goal || todo?.campaign || topic).icon}</span>
+            )}
             {title}
           </span>
         </Link>
@@ -321,11 +379,19 @@ function Focus() {
               <Eye size={14} aria-hidden="true" />{session.distractions} left
             </span>
           )}
-          <button type="button" className={`focus-icon-btn ${panel === 'notes' ? 'is-on' : ''}`}
-            onClick={() => setPanel(panel === 'notes' ? null : 'notes')} aria-pressed={panel === 'notes'}
-            aria-label="Session notes (N)" title="Session notes (N)">
-            <NotebookPen size={18} />
-          </button>
+          {topic ? (
+            <button type="button" className={`focus-icon-btn ${studyOpen ? 'is-on' : ''}`}
+              onClick={() => setPanel(studyOpen ? null : 'study')} aria-pressed={studyOpen}
+              aria-label="Videos and notes (N)" title="Videos and notes (N)">
+              <BookOpen size={18} />
+            </button>
+          ) : (
+            <button type="button" className={`focus-icon-btn ${panel === 'notes' ? 'is-on' : ''}`}
+              onClick={() => setPanel(panel === 'notes' ? null : 'notes')} aria-pressed={panel === 'notes'}
+              aria-label="Session notes (N)" title="Session notes (N)">
+              <NotebookPen size={18} />
+            </button>
+          )}
           <button type="button" className={`focus-icon-btn ${panel === 'apps' ? 'is-on' : ''}`}
             onClick={() => setPanel(panel === 'apps' ? null : 'apps')} aria-pressed={panel === 'apps'}
             aria-label="Allowed apps" title="Allowed apps">
@@ -378,7 +444,11 @@ function Focus() {
             <div className="summary-stats">
               <div><span className="summary-num">{formatDuration(session.focusedSeconds)}</span><span>focused</span></div>
               <div><span className="summary-num">{session.distractions}</span><span>times you left</span></div>
-              <div><span className="summary-num">{notes.trim() ? 'Saved' : 'None'}</span><span>notes</span></div>
+              {topic ? (
+                <div><span className="summary-num">{topicState === 'error' ? 'Not saved' : 'Saved'}</span><span>topic notes</span></div>
+              ) : (
+                <div><span className="summary-num">{notes.trim() ? 'Saved' : 'None'}</span><span>notes</span></div>
+              )}
             </div>
             {session.status === 'abandoned' && (
               <p className="focus-meta">Sessions under a minute aren't counted.</p>
@@ -400,7 +470,7 @@ function Focus() {
                 <RotateCcw size={16} aria-hidden="true" />Another {formatDuration(session.plannedSeconds)}
               </button>
               <Link to={backTo} className="btn btn-large">
-                {session.goal ? 'Back to goal' : session.campaign ? 'Back to campaign' : 'Back to sessions'}
+                {session.goal ? 'Back to goal' : session.campaign ? 'Back to campaign' : session.topic ? 'Back to topic' : 'Back to sessions'}
               </Link>
             </div>
           </motion.div>
@@ -409,8 +479,59 @@ function Focus() {
         {error && session && <p className="focus-error" role="alert">{error}</p>}
       </main>
 
+      {/* Stays mounted while hidden, so a video keeps playing with the panel closed. */}
+      {topic && (
+        <motion.aside className="focus-panel study-panel" aria-label="Videos and notes" inert={!studyOpen}
+          initial={false} animate={studyOpen ? { x: 0, opacity: 1 } : { x: 40, opacity: 0 }}
+          style={{ pointerEvents: studyOpen ? 'auto' : 'none' }}
+          transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
+          <div className="focus-panel-head">
+            <h2>Videos & notes</h2>
+            {/* On a phone the panel covers the timer, so a small copy of it sits here. */}
+            {session && !done && (
+              <button type="button" className="study-clock" onClick={togglePause} disabled={busy}
+                aria-label={running ? 'Pause (Space)' : 'Resume (Space)'}>
+                {running ? <Pause size={13} aria-hidden="true" /> : <Play size={13} aria-hidden="true" />}
+                {formatClock(remaining)}
+              </button>
+            )}
+            <span className="focus-panel-state">
+              {{ saved: 'Saved', unsaved: 'Editing…', saving: 'Saving…', error: 'Not saved' }[topicState]}
+            </span>
+            <button type="button" className="focus-icon-btn" onClick={() => setPanel(null)} aria-label="Close panel">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="study-scroll">
+            {playingVideo && (
+              <VideoPlayer video={playingVideo} onOpenOutside={() => { allowedLeaveAt.current = Date.now() }} />
+            )}
+            <div className="study-videos">
+              {topic.videos.length > 0 && (
+                <VideoList videos={topic.videos} activeId={playingVideo?._id} onSelect={(v) => setVideoId(v._id)} strip />
+              )}
+              {topic.videos.length === 0 || addingVideo ? (
+                <AddVideoForm topicId={topic._id} autoFocus={addingVideo}
+                  onAdded={(saved, video) => {
+                    setTopic((t) => ({ ...t, videos: saved.videos }))
+                    setVideoId(video._id)
+                    setAddingVideo(false)
+                  }} />
+              ) : (
+                <button type="button" className="link-btn study-add-link" onClick={() => setAddingVideo(true)}>
+                  <Plus size={14} aria-hidden="true" />Add a video
+                </button>
+              )}
+            </div>
+            <div className="study-notes">
+              <GoalEditor content={topic.content} onChange={handleTopicDoc} label="Topic notes" />
+            </div>
+          </div>
+        </motion.aside>
+      )}
+
       <AnimatePresence>
-        {panel && (
+        {panel && panel !== 'study' && (
           <motion.aside className="focus-panel" key="panel" aria-label={panel === 'notes' ? 'Session notes' : 'Allowed apps'}
             initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: 40, opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 34 }}>
